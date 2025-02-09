@@ -2,12 +2,6 @@ import streamlit as st
 import requests
 
 ###############################################################################
-# No inline API Keys - read from st.secrets
-# Ensure you define `openai_api_key` and `groq_api_key` in .streamlit/secrets.toml
-# or in your Streamlit Cloud app's "Advanced settings".
-###############################################################################
-
-###############################################################################
 # Default Named System Prompts
 ###############################################################################
 default_system_prompts = {
@@ -33,13 +27,13 @@ def call_openai_api(system_prompt, conversation_messages, model, temperature, ma
     Calls an OpenAI-like Chat Completion endpoint with every turn in `conversation_messages`.
     The first message is the system prompt. All subsequent messages are user or assistant roles.
     """
-    # Example endpoint for demonstration; adapt to your actual server if needed
     api_url = "https://api.openai.com/v1/chat/completions"
 
-    # Read your OpenAI key from st.secrets
-    openai_api_key = st.secrets["openai_api_key"]  # <--- Key from secrets
+    # Retrieve from st.secrets
+    openai_api_key = st.secrets["openai_api_key"]
 
     messages = [{"role": "system", "content": system_prompt}] + conversation_messages
+
     data = {
         "model": model,
         "messages": messages,
@@ -57,20 +51,21 @@ def call_openai_api(system_prompt, conversation_messages, model, temperature, ma
         completion = response.json()
         return completion["choices"][0]["message"]["content"]
     except (requests.exceptions.RequestException, KeyError) as e:
-        return f"Error calling OpenAI-like API: {e}"
+        return f"Error calling ChatGPT API: {e}"
 
 
 def call_groq_api(system_prompt, conversation_messages, model, temperature, max_tokens):
     """
-    Calls the Groq endpoint for chat completions, similarly passing in a system prompt
+    Calls the Groq endpoint for chat completions, passing in a system prompt
     as the first message, followed by the conversation.
     """
     api_url = "https://api.groq.com/openai/v1/chat/completions"
 
-    # Read your Groq key from st.secrets
-    groq_api_key = st.secrets["groq_api_key"]  # <--- Key from secrets
+    # Retrieve from st.secrets
+    groq_api_key = st.secrets["groq_api_key"]
 
     messages = [{"role": "system", "content": system_prompt}] + conversation_messages
+
     data = {
         "model": model,
         "messages": messages,
@@ -96,7 +91,7 @@ def call_groq_api(system_prompt, conversation_messages, model, temperature, max_
 ###############################################################################
 
 def main():
-    st.title("Multi-turn Conversation (Bottomsheet)")
+    st.title("Custom ChatGPT")
 
     # Initialize session states
     if "messages" not in st.session_state:
@@ -112,11 +107,13 @@ def main():
 
     # Sidebar: LLM Provider & Model
     st.sidebar.header("LLM Configuration")
+
     provider = st.sidebar.selectbox(
         "LLM API Provider",
-        ["ChatGPT", "Groq"]
+        ["ChatGPT", "Groq"]  # Changed "OpenAI-like" to "ChatGPT"
     )
-    if provider == "OpenAI-like":
+
+    if provider == "ChatGPT":
         model = st.sidebar.selectbox(
             "Choose model",
             ["gpt-4o", "gpt-4o-mini"],
@@ -131,9 +128,11 @@ def main():
 
     # Sidebar: System Prompt Selection (by name)
     st.sidebar.header("System Prompt")
-    combined_prompt_names = (list(default_system_prompts.keys())
-                             + list(st.session_state["custom_system_prompts"].keys())
-                             + ["Add New System Prompt"])
+    combined_prompt_names = (
+        list(default_system_prompts.keys())
+        + list(st.session_state["custom_system_prompts"].keys())
+        + ["Add New System Prompt"]
+    )
 
     selected_prompt_name = st.sidebar.selectbox(
         "Select Prompt Name:",
@@ -150,14 +149,12 @@ def main():
                     st.session_state["system_prompt_text"] = new_prompt_text
                     st.success(f"Added new prompt: {new_prompt_name}")
                 else:
-                    st.error("Please provide both name and text for the new system prompt.")
+                    st.error("Please provide both a name and text for the new system prompt.")
     else:
         if selected_prompt_name in default_system_prompts:
             st.session_state["system_prompt_text"] = default_system_prompts[selected_prompt_name]
         elif selected_prompt_name in st.session_state["custom_system_prompts"]:
-            st.session_state["system_prompt_text"] = (
-                st.session_state["custom_system_prompts"][selected_prompt_name]
-            )
+            st.session_state["system_prompt_text"] = st.session_state["custom_system_prompts"][selected_prompt_name]
 
     # Sidebar: Parameters + Reset
     st.sidebar.header("LLM Parameter Tweaking")
@@ -167,7 +164,6 @@ def main():
         st.session_state["messages"] = []
 
     # Display Conversation
-    st.subheader("Conversation")
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant"):
