@@ -55,14 +55,6 @@ def call_openai_api(system_prompt, conversation_messages, model, temperature, ma
 
 
 def call_groq_api(system_prompt, conversation_messages, model, temperature, max_tokens):
-    """
-    Calls the Groq endpoint for chat completions.
-    Example cURL snippet:
-      curl https://api.groq.com/openai/v1/chat/completions -s \
-      -H "Content-Type: application/json" \
-      -H "Authorization: Bearer $GROQ_API_KEY" \
-      -d '{ "model" : "llama-3.3-70b-versatile", "messages": [...] }'
-    """
     api_url = "https://api.groq.com/openai/v1/chat/completions"
 
     groq_api_key = st.secrets["groq_api_key"]
@@ -141,22 +133,6 @@ def call_google_api(system_prompt, conversation_messages, model, temperature, ma
         response = requests.post(endpoint, headers=headers, json=payload, timeout=60)
         response.raise_for_status()
         reply = response.json()
-
-        # Updated parsing logic according to the new structure:
-        #
-        # {
-        #   "candidates": [
-        #       {
-        #           "content": {
-        #               "parts": [
-        #                   {"text": "..."}
-        #               ],
-        #               "role": "model"
-        #           },
-        #           ...
-        #       }
-        #   ]
-        # }
         text_response = reply["candidates"][0]["content"]["parts"][0]["text"]
         return text_response
 
@@ -184,26 +160,27 @@ def main():
     st.sidebar.header("LLM Configuration")
     provider = st.sidebar.selectbox(
         "LLM API Provider",
-        ["ChatGPT", "Groq", "Google"]  # Added "Google" here
+        ["Groq", "ChatGPT", "Google"]  # Added "Google" here
     )
 
-    if provider == "ChatGPT":
-        model = st.sidebar.selectbox(
-            "Choose model",
-            ["gpt-4o", "gpt-4o-mini"],
-            index=0
-        )
-    elif provider == "Groq":
+    if provider == "Groq":
         model = st.sidebar.selectbox(
             "Choose model",
             ["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
+            index=0
+        )
+        
+    elif provider == "ChatGPT":
+        model = st.sidebar.selectbox(
+            "Choose model",
+            ["gpt-4o-mini","gpt-4o", ],
             index=0
         )
     else:  # Google
         # For example "gemini-1.5-flash", or any other model name if you have them available
         model = st.sidebar.selectbox(
             "Choose model",
-            ["gemini-1.5-flash"],
+            ["gemini-1.5-flash","gemini-2.0-flash-thinking-exp-01-21","gemini-2.0-pro-exp-02-05"],
             index=0
         )
 
