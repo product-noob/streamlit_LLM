@@ -1,0 +1,230 @@
+import streamlit as st
+import requests
+import json
+
+###############################################################################
+# Inline API Keys
+###############################################################################
+openai_api_key = "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"
+groq_api_key = "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"
+
+###############################################################################
+# Default Named System Prompts
+###############################################################################
+default_system_prompts = {
+    "Helpful AI": (
+        "You are a helpful AI assistant. Provide useful, precise, and correct "
+        "answers to user queries."
+    ),
+    "Creative Writer": (
+        "You are a creative writer who loves storytelling. Provide imaginative "
+        "narrative responses to user instructions."
+    ),
+    "Instructor": (
+        "You are an instructor who explains topics succinctly and systematically."
+    )
+}
+
+###############################################################################
+# LLM Call Functions
+###############################################################################
+
+def call_openai_api(system_prompt, conversation_messages, model, temperature, max_tokens):
+    """
+    Calls an OpenAI-like Chat Completion endpoint with every turn in `conversation_messages`.
+    The first message is the system prompt. All subsequent messages are user or assistant roles.
+    """
+    # Example endpoint for demonstration; adapt to your actual server if needed
+    api_url = "https://api.openai.com/v1/chat/completions"
+
+    # Combine system prompt with the conversation (the system prompt is always first).
+    messages = [{"role": "system", "content": system_prompt}] + conversation_messages
+
+    data = {
+        "model": model,  # e.g. "gpt-4o" or "gpt-4o-mini"
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {openai_api_key}"
+    }
+
+    try:
+        response = requests.post(api_url, headers=headers, json=data, timeout=60)
+        response.raise_for_status()
+        completion = response.json()
+        return completion["choices"][0]["message"]["content"]
+    except (requests.exceptions.RequestException, KeyError) as e:
+        return f"Error calling OpenAI-like API: {e}"
+
+
+def call_groq_api(system_prompt, conversation_messages, model, temperature, max_tokens):
+    """
+    Calls the Groq endpoint for chat completions, similarly passing in a system prompt
+    as the first message, followed by the conversation.
+    """
+    api_url = "https://api.groq.com/openai/v1/chat/completions"
+
+    # Combine system prompt with conversation
+    messages = [{"role": "system", "content": system_prompt}] + conversation_messages
+
+    data = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {groq_api_key}"
+    }
+
+    try:
+        response = requests.post(api_url, headers=headers, json=data, timeout=60)
+        response.raise_for_status()
+        completion = response.json()
+        return completion["choices"][0]["message"]["content"]
+    except (requests.exceptions.RequestException, KeyError) as e:
+        return f"Error calling Groq API: {e}"
+
+
+###############################################################################
+# Main Streamlit App
+###############################################################################
+
+def main():
+    st.title("AI Chatbot")
+
+    # Initialize session states
+    if "messages" not in st.session_state:
+        st.session_state["messages"] = []
+
+    if "system_prompt_text" not in st.session_state:
+        # Default to "Helpful AI" from the start
+        st.session_state["system_prompt_text"] = default_system_prompts["Helpful AI"]
+
+    if "custom_system_prompts" not in st.session_state:
+        # Dictionary for user-added prompts: { prompt_name: prompt_text, ... }
+        st.session_state["custom_system_prompts"] = {}
+
+    ###########################################################################
+    # Sidebar: Provider & Model
+    ###########################################################################
+    st.sidebar.header("LLM Configuration")
+
+    provider = st.sidebar.selectbox(
+        "LLM API Provider",
+        ["OpenAI-like", "Groq"]
+    )
+
+    if provider == "OpenAI-like":
+        model = st.sidebar.selectbox(
+            "Choose model",
+            ["gpt-4o", "gpt-4o-mini"],
+            index=0
+        )
+    else:
+        model = st.sidebar.selectbox(
+            "Choose model",
+            ["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
+            index=0
+        )
+
+    ###########################################################################
+    # Sidebar: System Prompt Selection (by name)
+    ###########################################################################
+    st.sidebar.header("System Prompt")
+
+    # Merge default + custom prompts into a single dictionary for display
+    # We'll place "Add New System Prompt" at the bottom.
+    combined_prompt_names = list(default_system_prompts.keys()) + list(st.session_state["custom_system_prompts"].keys()) + ["Add New System Prompt"]
+
+    selected_prompt_name = st.sidebar.selectbox(
+        "Select Prompt Name:",
+        combined_prompt_names
+    )
+
+    # If "Add New System Prompt" is selected, show a small form to capture prompt name and text
+    if selected_prompt_name == "Add New System Prompt":
+        with st.sidebar.expander("Add New Prompt"):
+            new_prompt_name = st.text_input("Enter custom prompt name:")
+            new_prompt_text = st.text_area("Enter full system prompt text:")
+            if st.button("Save New Prompt"):
+                if new_prompt_name.strip() and new_prompt_text.strip():
+                    # Store the new system prompt in session_state
+                    st.session_state["custom_system_prompts"][new_prompt_name] = new_prompt_text
+                    # Also set it to be the active system prompt
+                    st.session_state["system_prompt_text"] = new_prompt_text
+                    st.success(f"Added new prompt: {new_prompt_name}")
+                else:
+                    st.error("Please provide both name and text for the new system prompt.")
+    else:
+        # If user picked an existing default or custom prompt, set the active text
+        if selected_prompt_name in default_system_prompts:
+            st.session_state["system_prompt_text"] = default_system_prompts[selected_prompt_name]
+        elif selected_prompt_name in st.session_state["custom_system_prompts"]:
+            st.session_state["system_prompt_text"] = st.session_state["custom_system_prompts"][selected_prompt_name]
+
+    ###########################################################################
+    # Sidebar: Parameters + Reset context
+    ###########################################################################
+    st.sidebar.header("LLM Parameter Tweaking")
+    temperature = st.sidebar.slider("Temperature", 0.0, 1.0, 0.7, 0.1)
+    max_tokens = st.sidebar.slider("Max Tokens", 1, 2048, 128, 1)
+
+    if st.sidebar.button("Reset context"):
+        st.session_state["messages"] = []
+
+    ###########################################################################
+    # Display Conversation
+    ###########################################################################
+    st.subheader("Conversation")
+    for msg in st.session_state["messages"]:
+        if msg["role"] == "assistant":
+            with st.chat_message("assistant"):
+                st.markdown(msg["content"])
+        else:
+            with st.chat_message("user"):
+                st.markdown(msg["content"])
+
+    ###########################################################################
+    # Bottomsheet Chat Input
+    ###########################################################################
+    if user_text := st.chat_input("Your message"):
+        # Append user query to conversation
+        st.session_state["messages"].append({"role": "user", "content": user_text})
+
+        # Show user message in chat
+        with st.chat_message("user"):
+            st.markdown(user_text)
+
+        # Call the model to get assistant's response
+        with st.spinner("Thinking..."):
+            if provider == "OpenAI-like":
+                response_text = call_openai_api(
+                    system_prompt=st.session_state["system_prompt_text"],
+                    conversation_messages=st.session_state["messages"],
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+            else:
+                response_text = call_groq_api(
+                    system_prompt=st.session_state["system_prompt_text"],
+                    conversation_messages=st.session_state["messages"],
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+
+        # Add assistant response to conversation and show it
+        st.session_state["messages"].append({"role": "assistant", "content": response_text})
+
+        with st.chat_message("assistant"):
+            st.markdown(response_text)
+
+
+if __name__ == "__main__":
+    main()
