@@ -183,7 +183,7 @@ def main():
             st.markdown(user_text)
 
         with st.spinner("Thinking..."):
-            if provider == "OpenAI-like":
+            if provider == "ChatGPT":
                 response_text = call_openai_api(
                     system_prompt=st.session_state["system_prompt_text"],
                     conversation_messages=st.session_state["messages"],
