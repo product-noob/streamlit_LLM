@@ -114,7 +114,7 @@ def main():
     st.sidebar.header("LLM Configuration")
     provider = st.sidebar.selectbox(
         "LLM API Provider",
-        ["OpenAI-like", "Groq"]
+        ["ChatGPT", "Groq"]
     )
     if provider == "OpenAI-like":
         model = st.sidebar.selectbox(
