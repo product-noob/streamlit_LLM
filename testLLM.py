@@ -1,12 +1,11 @@
 import streamlit as st
 import requests
-import json
 
 ###############################################################################
-# Inline API Keys
+# No inline API Keys - read from st.secrets
+# Ensure you define `openai_api_key` and `groq_api_key` in .streamlit/secrets.toml
+# or in your Streamlit Cloud app's "Advanced settings".
 ###############################################################################
-openai_api_key = "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"
-groq_api_key = "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"
 
 ###############################################################################
 # Default Named System Prompts
@@ -37,11 +36,12 @@ def call_openai_api(system_prompt, conversation_messages, model, temperature, ma
     # Example endpoint for demonstration; adapt to your actual server if needed
     api_url = "https://api.openai.com/v1/chat/completions"
 
-    # Combine system prompt with the conversation (the system prompt is always first).
-    messages = [{"role": "system", "content": system_prompt}] + conversation_messages
+    # Read your OpenAI key from st.secrets
+    openai_api_key = st.secrets["openai_api_key"]  # <--- Key from secrets
 
+    messages = [{"role": "system", "content": system_prompt}] + conversation_messages
     data = {
-        "model": model,  # e.g. "gpt-4o" or "gpt-4o-mini"
+        "model": model,
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens
@@ -67,9 +67,10 @@ def call_groq_api(system_prompt, conversation_messages, model, temperature, max_
     """
     api_url = "https://api.groq.com/openai/v1/chat/completions"
 
-    # Combine system prompt with conversation
-    messages = [{"role": "system", "content": system_prompt}] + conversation_messages
+    # Read your Groq key from st.secrets
+    groq_api_key = st.secrets["groq_api_key"]  # <--- Key from secrets
 
+    messages = [{"role": "system", "content": system_prompt}] + conversation_messages
     data = {
         "model": model,
         "messages": messages,
@@ -95,7 +96,7 @@ def call_groq_api(system_prompt, conversation_messages, model, temperature, max_
 ###############################################################################
 
 def main():
-    st.title("AI Chatbot")
+    st.title("Multi-turn Conversation (Bottomsheet)")
 
     # Initialize session states
     if "messages" not in st.session_state:
@@ -109,16 +110,12 @@ def main():
         # Dictionary for user-added prompts: { prompt_name: prompt_text, ... }
         st.session_state["custom_system_prompts"] = {}
 
-    ###########################################################################
-    # Sidebar: Provider & Model
-    ###########################################################################
+    # Sidebar: LLM Provider & Model
     st.sidebar.header("LLM Configuration")
-
     provider = st.sidebar.selectbox(
         "LLM API Provider",
         ["OpenAI-like", "Groq"]
     )
-
     if provider == "OpenAI-like":
         model = st.sidebar.selectbox(
             "Choose model",
@@ -132,75 +129,59 @@ def main():
             index=0
         )
 
-    ###########################################################################
     # Sidebar: System Prompt Selection (by name)
-    ###########################################################################
     st.sidebar.header("System Prompt")
-
-    # Merge default + custom prompts into a single dictionary for display
-    # We'll place "Add New System Prompt" at the bottom.
-    combined_prompt_names = list(default_system_prompts.keys()) + list(st.session_state["custom_system_prompts"].keys()) + ["Add New System Prompt"]
+    combined_prompt_names = (list(default_system_prompts.keys())
+                             + list(st.session_state["custom_system_prompts"].keys())
+                             + ["Add New System Prompt"])
 
     selected_prompt_name = st.sidebar.selectbox(
         "Select Prompt Name:",
         combined_prompt_names
     )
 
-    # If "Add New System Prompt" is selected, show a small form to capture prompt name and text
     if selected_prompt_name == "Add New System Prompt":
         with st.sidebar.expander("Add New Prompt"):
             new_prompt_name = st.text_input("Enter custom prompt name:")
             new_prompt_text = st.text_area("Enter full system prompt text:")
             if st.button("Save New Prompt"):
                 if new_prompt_name.strip() and new_prompt_text.strip():
-                    # Store the new system prompt in session_state
                     st.session_state["custom_system_prompts"][new_prompt_name] = new_prompt_text
-                    # Also set it to be the active system prompt
                     st.session_state["system_prompt_text"] = new_prompt_text
                     st.success(f"Added new prompt: {new_prompt_name}")
                 else:
                     st.error("Please provide both name and text for the new system prompt.")
     else:
-        # If user picked an existing default or custom prompt, set the active text
         if selected_prompt_name in default_system_prompts:
             st.session_state["system_prompt_text"] = default_system_prompts[selected_prompt_name]
         elif selected_prompt_name in st.session_state["custom_system_prompts"]:
-            st.session_state["system_prompt_text"] = st.session_state["custom_system_prompts"][selected_prompt_name]
+            st.session_state["system_prompt_text"] = (
+                st.session_state["custom_system_prompts"][selected_prompt_name]
+            )
 
-    ###########################################################################
-    # Sidebar: Parameters + Reset context
-    ###########################################################################
+    # Sidebar: Parameters + Reset
     st.sidebar.header("LLM Parameter Tweaking")
     temperature = st.sidebar.slider("Temperature", 0.0, 1.0, 0.7, 0.1)
     max_tokens = st.sidebar.slider("Max Tokens", 1, 2048, 128, 1)
-
     if st.sidebar.button("Reset context"):
         st.session_state["messages"] = []
 
-    ###########################################################################
     # Display Conversation
-    ###########################################################################
     st.subheader("Conversation")
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant"):
                 st.markdown(msg["content"])
-        else:
+        else:  # user
             with st.chat_message("user"):
                 st.markdown(msg["content"])
 
-    ###########################################################################
     # Bottomsheet Chat Input
-    ###########################################################################
     if user_text := st.chat_input("Your message"):
-        # Append user query to conversation
         st.session_state["messages"].append({"role": "user", "content": user_text})
-
-        # Show user message in chat
         with st.chat_message("user"):
             st.markdown(user_text)
 
-        # Call the model to get assistant's response
         with st.spinner("Thinking..."):
             if provider == "OpenAI-like":
                 response_text = call_openai_api(
@@ -219,7 +200,6 @@ def main():
                     max_tokens=max_tokens
                 )
 
-        # Add assistant response to conversation and show it
         st.session_state["messages"].append({"role": "assistant", "content": response_text})
 
         with st.chat_message("assistant"):
