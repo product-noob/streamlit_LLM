@@ -161,7 +161,7 @@ def call_google_api(system_prompt, conversation_messages, model, temperature, ma
 ###############################################################################
 
 def main():
-    st.title("Multi-turn Conversation (Bottomsheet)")
+    st.title("Custom LLM Chatbot")
 
     # Initialize session states
     if "messages" not in st.session_state:
@@ -240,7 +240,6 @@ def main():
         st.session_state["messages"] = []
 
     # Display Conversation
-    st.subheader("Conversation")
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant"):
