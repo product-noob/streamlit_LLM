@@ -167,7 +167,7 @@ def call_google_api(system_prompt, conversation_messages, model, temperature, ma
 ###############################################################################
 
 def main():
-    st.title("Custom LLM Chatbot")
+    st.title("LLM Chatbot")
 
     # Initialize session states
     if "messages" not in st.session_state:
