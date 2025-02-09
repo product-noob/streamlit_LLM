@@ -88,43 +88,39 @@ def call_groq_api(system_prompt, conversation_messages, model, temperature, max_
     except (requests.exceptions.RequestException, KeyError) as e:
         return f"Error calling Groq API: {e}"
 
-
 def call_google_api(system_prompt, conversation_messages, model, temperature, max_tokens):
     """
     Calls the Google Generative Language endpoint.
-    Example cURL snippet:
-      curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=GEMINI_API_KEY"
-           -H 'Content-Type: application/json'
-           -X POST
-           -d '{
-               "contents": [{
-                  "parts":[{"text": "Explain how AI works"}]
-               }]
-            }'
-    We'll combine the system prompt and conversation messages into a single text block.
-    Note: The gemini endpoint doesn't appear to use temperature/max_tokens in the snippet,
-    but we'll pass them in if your deployment supports them.
-    """
-    # Typically: https://generativelanguage.googleapis.com/v1beta/models/<MODEL>:generateContent?key=<API_KEY>
-    # For example: "gemini-1.5-flash"
-    # We'll allow 'model' from the user to pick "gemini-1.5-flash" or others.
+    ...
+    We update parsing according to the new sample structure:
 
+    {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "text": "Artificial intelligence (AI) is..."
+                        }
+                    ],
+                    "role": "model"
+                },
+                "finishReason": "STOP",
+                "avgLogprobs": ...
+            }
+        ]
+    }
+    """
     google_api_key = st.secrets["google_api_key"]  # "GEMINI_API_KEY" from secrets
     base_url = "https://generativelanguage.googleapis.com/v1beta"
     endpoint = f"{base_url}/models/{model}:generateContent?key={google_api_key}"
 
-    # Combine conversation messages into one text prompt.
-    # For multi-turn logic, we can just chain all user/assistant content in order.
-    # The snippet only shows single-turn usage.
-    # We’ll do a simple approach: system_prompt + each user/assistant entry (but only user entries typically needed).
+    # Combine conversation for demonstration only. You can adjust to your strategy.
     combined_text = system_prompt + "\n"
     for msg in conversation_messages:
-        # We'll only include user messages in the final content for this example, skipping assistant messages
-        # to keep it consistent with the cURL snippet. But you can adapt as you wish.
         if msg["role"] == "user":
             combined_text += f"User: {msg['content']}\n"
         elif msg["role"] == "assistant":
-            # Optionally incorporate assistant messages as well
             combined_text += f"Assistant: {msg['content']}\n"
 
     payload = {
@@ -135,11 +131,8 @@ def call_google_api(system_prompt, conversation_messages, model, temperature, ma
                 ]
             }
         ]
-        # "temperature": temperature, "maxOutputTokens": max_tokens, etc.
-        # The snippet doesn't provide these fields, but if the API supports them,
-        # you could pass them by reading the docs or extra parameters.
+        # Optionally specify "temperature", "maxOutputTokens" or other fields if your endpoint supports them
     }
-
     headers = {
         "Content-Type": "application/json"
     }
@@ -148,14 +141,27 @@ def call_google_api(system_prompt, conversation_messages, model, temperature, ma
         response = requests.post(endpoint, headers=headers, json=payload, timeout=60)
         response.raise_for_status()
         reply = response.json()
-        # This endpoint nominally returns something like:
-        # { "contents": [ { "parts":[ {"text": "..."} ] } ] }
-        # We'll parse out the text.
-        return reply["contents"][0]["parts"][0]["text"]
+
+        # Updated parsing logic according to the new structure:
+        #
+        # {
+        #   "candidates": [
+        #       {
+        #           "content": {
+        #               "parts": [
+        #                   {"text": "..."}
+        #               ],
+        #               "role": "model"
+        #           },
+        #           ...
+        #       }
+        #   ]
+        # }
+        text_response = reply["candidates"][0]["content"]["parts"][0]["text"]
+        return text_response
+
     except (requests.exceptions.RequestException, KeyError, IndexError) as e:
         return f"Error calling Google API: {e}"
-
-
 ###############################################################################
 # Streamlit Multi-turn Conversation App with Bottomsheet Chat
 ###############################################################################
