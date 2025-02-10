@@ -23,10 +23,6 @@ default_system_prompts = {
 ###############################################################################
 
 def call_openai_api(system_prompt, conversation_messages, model, temperature, max_tokens):
-    """
-    Calls a ChatGPT-like Chat Completion endpoint with every turn in `conversation_messages`.
-    We place a system message first, followed by user and assistant turns.
-    """
     api_url = "https://api.openai.com/v1/chat/completions"
 
     # Retrieve from st.secrets
@@ -56,11 +52,8 @@ def call_openai_api(system_prompt, conversation_messages, model, temperature, ma
 
 def call_groq_api(system_prompt, conversation_messages, model, temperature, max_tokens):
     api_url = "https://api.groq.com/openai/v1/chat/completions"
-
     groq_api_key = st.secrets["groq_api_key"]
-
     messages = [{"role": "system", "content": system_prompt}] + conversation_messages
-
     data = {
         "model": model,
         "messages": messages,
@@ -81,28 +74,6 @@ def call_groq_api(system_prompt, conversation_messages, model, temperature, max_
         return f"Error calling Groq API: {e}"
 
 def call_google_api(system_prompt, conversation_messages, model, temperature, max_tokens):
-    """
-    Calls the Google Generative Language endpoint.
-    ...
-    We update parsing according to the new sample structure:
-
-    {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": "Artificial intelligence (AI) is..."
-                        }
-                    ],
-                    "role": "model"
-                },
-                "finishReason": "STOP",
-                "avgLogprobs": ...
-            }
-        ]
-    }
-    """
     google_api_key = st.secrets["google_api_key"]  # "GEMINI_API_KEY" from secrets
     base_url = "https://generativelanguage.googleapis.com/v1beta"
     endpoint = f"{base_url}/models/{model}:generateContent?key={google_api_key}"
@@ -166,7 +137,7 @@ def main():
     if provider == "Groq":
         model = st.sidebar.selectbox(
             "Choose model",
-            ["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
+            ["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "deepseek-r1-distill-llama-70b","mixtral-8x7b-32768"],
             index=0
         )
         
